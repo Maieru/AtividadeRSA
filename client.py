@@ -4,14 +4,19 @@ import concurrent.futures
 import socket
 from comunicationConstants import server_ip, port
 
-keySize = 512
+keySize = 2048
 messageToSend = "The information security is of significant importance to ensure the privacy of communications"
+
+start_time = time.time()
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
     future_p = executor.submit(RSA.generate_prime_number, keySize)
     future_q = executor.submit(RSA.generate_prime_number, keySize)
     p = future_p.result()
     q = future_q.result()
+
+finish_time = time.time()
+print("Tempo para gerar os números primos: ", finish_time - start_time)
 
 n = RSA.getN(p, q)
 totientN = RSA.totient(p, q)

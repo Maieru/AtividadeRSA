@@ -1,17 +1,22 @@
 import math
 from random import randrange, getrandbits
 from sympy import isprime
+from concurrent.futures import ThreadPoolExecutor
 
 class RSA:
     @staticmethod
     def generate_prime_number(length=1024):
-        numero = getrandbits(length)
-
-        while not isprime(numero):
+        def check_prime():
             numero = getrandbits(length)
+            return numero if isprime(numero) else None
 
-        return numero
-    
+        with ThreadPoolExecutor(max_workers=1000) as executor:
+            while True:
+                future = executor.submit(check_prime)
+                prime = future.result()
+                if prime:
+                    return prime
+
     @staticmethod
     def getN(p, q):
         return p * q
@@ -46,22 +51,22 @@ class RSA:
         cipher = []
         for char in message:
             cipher.append(str(pow(ord(char), e, n)))
-        return ','.join(cipher)
+        return ",".join(cipher)
 
     @staticmethod
     def decrypt(cipher, d, n):
         decrypted = []
-        cipherCharacters = [i.strip() for i in cipher.split(',') if i.strip()]
+        cipherCharacters = [i.strip() for i in cipher.split(",") if i.strip()]
         for encrypted in cipherCharacters:
             encryptedInt = int(encrypted)
             decrypted.append(chr(pow(encryptedInt, d, n)))
-        return ''.join(decrypted)
+        return "".join(decrypted)
 
     @staticmethod
     def format_public_key(e, n):
         return f"{e},{n}"
-    
+
     @staticmethod
     def get_public_key(formated_public_key):
-        e, n = formated_public_key.split(',')
+        e, n = formated_public_key.split(",")
         return int(e), int(n)
