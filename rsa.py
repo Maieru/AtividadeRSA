@@ -2,6 +2,8 @@ import math
 from random import randrange, getrandbits
 from sympy import isprime
 from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool, cpu_count
+
 
 class RSA:
     @staticmethod
@@ -10,7 +12,7 @@ class RSA:
             numero = getrandbits(length)
             return numero if isprime(numero) else None
 
-        with ThreadPoolExecutor(max_workers=1000) as executor:
+        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
             while True:
                 future = executor.submit(check_prime)
                 prime = future.result()
