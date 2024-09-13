@@ -1,32 +1,17 @@
 import math
-from random import randrange, getrandbits
+from random import getrandbits
 from sympy import isprime
-from concurrent.futures import ThreadPoolExecutor
-from multiprocessing import Pool, cpu_count
-
 
 class RSA:
     @staticmethod
     def generate_prime_number(length=1024):
         """
         Gera um número primo de um determinado comprimento de bits.
-        Utiliza múltiplas threads para verificar números aleatórios em paralelo.
         """
-        def check_prime():
-            """
-            Gera um número aleatório e verifica se é primo.
-            """
+        while True:
             numero = getrandbits(length)
-            return numero if isprime(numero) else None
-
-        with ThreadPoolExecutor(max_workers=cpu_count()) as executor:
-            while True:
-                # Submete 100 tarefas para verificar números primos em paralelo
-                futures = [executor.submit(check_prime) for _ in range(100)]
-                for future in futures:
-                    result = future.result()
-                    if result is not None:
-                        return result
+            if isprime(numero):
+                return numero
 
     @staticmethod
     def getN(p, q):
@@ -45,7 +30,7 @@ class RSA:
     @staticmethod
     def getE(totient):
         """
-        Encontra um valor para e que seja coprimo com o totiente.
+        Encontra um valor para e que seja coprimo com o totient.
         """
         e = 65537  # Valor comum para e
         if RSA.gcd(e, totient) == 1:
@@ -75,7 +60,7 @@ class RSA:
     @staticmethod
     def encrypt(message, e, n):
         """
-        Criptografa uma mensagem usando a chave pública (e, n).
+        Criptografa uma mensagem usando a chave pública (e, n) com preenchimento PKCS#1 v1.5.
         
         Args:
             message (str): A mensagem a ser criptografada.
@@ -85,17 +70,25 @@ class RSA:
         Returns:
             str: A mensagem criptografada, com valores separados por vírgulas.
         """
-        cipher = []
-        for char in message:
-            # Converte o caractere para seu valor ASCII, eleva à potência e módulo n
-            cipher.append(str(pow(ord(char), e, n)))
-        # Junta os valores criptografados em uma string, separados por vírgulas
-        return ",".join(cipher)
+        # Converte a mensagem para bytes
+        message_bytes = message.encode('utf-8')
+        k = (n.bit_length() + 7) // 8  # Tamanho em bytes do módulo n
+        padding_length = k - len(message_bytes) - 3
+        if padding_length < 8:
+            raise ValueError("Mensagem muito longa")
+
+        # Gera o preenchimento
+        padding = b'\x00' + b'\x02' + getrandbits(8 * padding_length).to_bytes(padding_length, 'big').replace(b'\x00', b'\x01') + b'\x00' + message_bytes
+
+        # Converte o preenchimento para um inteiro e criptografa
+        m = int.from_bytes(padding, 'big')
+        c = pow(m, e, n)
+        return str(c)
 
     @staticmethod
     def decrypt(cipher, d, n):
         """
-        Descriptografa uma mensagem cifrada usando a chave privada (d, n).
+        Descriptografa uma mensagem cifrada usando a chave privada (d, n) com preenchimento PKCS#1 v1.5.
         
         Args:
             cipher (str): A mensagem cifrada, com valores separados por vírgulas.
@@ -105,14 +98,21 @@ class RSA:
         Returns:
             str: A mensagem descriptografada.
         """
-        decrypted = []
-        # Divide a mensagem cifrada em caracteres individuais e remove espaços em branco
-        cipherCharacters = [i.strip() for i in cipher.split(",") if i.strip()]
-        for encrypted in cipherCharacters:
-            encryptedInt = int(encrypted)  # Converte o caractere cifrado para inteiro
-            # Descriptografa o caractere usando a chave privada (d, n)
-            decrypted.append(chr(pow(encryptedInt, d, n)))
-        return "".join(decrypted)  # Junta os caracteres descriptografados em uma string
+        # Converte a mensagem cifrada para um inteiro
+        c = int(cipher)
+        m = pow(c, d, n)
+
+        # Converte o inteiro descriptografado para bytes
+        message_bytes = m.to_bytes((m.bit_length() + 7) // 8, 'big')
+        
+        # Remove o preenchimento PKCS#1 v1.5
+        if message_bytes[0:1] != b'\x02':
+            raise ValueError("Erro de preenchimento")
+        message_bytes = message_bytes[2:]
+        message_bytes = message_bytes[message_bytes.index(b'\x00') + 1:]
+
+        # Converte os bytes de volta para uma string
+        return message_bytes.decode('utf-8')
 
     @staticmethod
     def format_public_key(e, n):
@@ -129,15 +129,15 @@ class RSA:
         return f"{e},{n}"
 
     @staticmethod
-    def get_public_key(formated_public_key):
+    def get_public_key(formatted_public_key):
         """
         Converte uma chave pública formatada de volta para uma tupla de inteiros (e, n).
         
         Args:
-            formated_public_key (str): A chave pública formatada como uma string.
+            formatted_public_key (str): A chave pública formatada como uma string.
 
         Returns:
             tuple: A chave pública como uma tupla de inteiros (e, n).
         """
-        e, n = formated_public_key.split(",")
+        e, n = formatted_public_key.split(',')
         return int(e), int(n)
